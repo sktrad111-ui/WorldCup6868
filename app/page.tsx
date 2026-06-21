@@ -169,14 +169,15 @@ return () => clearInterval(timer);
     return alert("用户名已存在");
   }
 
-  const newUser = {
-    username,
-    password,
-    points: 0,
-    inviteCode,
-    invited: 0,
-    inviteReward: 0,
-  };
+ const newUser = {
+  username,
+  password,
+  points: 0,
+  inviteCode,
+  invitedBy: inviteInput || "",
+  invited: 0,
+  inviteReward: 0,
+};
 
   const { error } = await supabase.from("users").insert({
     username,
@@ -217,14 +218,15 @@ return () => clearInterval(timer);
     return alert("用户名或密码错误");
   }
 
-  const loginUser = {
-    username: data.username,
-    password: data.password,
-    points: data.points || 0,
-    inviteCode: data.invite_code,
-    invited: 0,
-    inviteReward: 0,
-  };
+ const loginUser = {
+  username: data.username,
+  password: data.password,
+  points: data.points || 0,
+  inviteCode: data.invite_code,
+  invitedBy: data.invited_by || "",
+  invited: 0,
+  inviteReward: 0,
+};
 
   saveCurrentUser(loginUser);
   setUsername("");
