@@ -1,0 +1,68 @@
+import { Match } from "../types";
+
+export const matches: Match[] = [
+  {
+    id: 66457006,
+    code: "Group I",
+    time: "06-16 03:00 PM EDT",
+    home: "France",
+    away: "Senegal",
+    status: "Not started",
+  },
+  {
+    id: 66457008,
+    code: "Group I",
+    time: "06-16 06:00 PM EDT",
+    home: "Iraq",
+    away: "Norway",
+    status: "Not started",
+  },
+  {
+    id: 66457018,
+    code: "Group J",
+    time: "06-16 09:00 PM EDT",
+    home: "Argentina",
+    away: "Algeria",
+    status: "Not started",
+  },
+  {
+    id: 66457020,
+    code: "Group J",
+    time: "06-17 12:00 AM EDT",
+    home: "Austria",
+    away: "Jordan",
+    status: "Not started",
+  },
+  {
+    id: 66457030,
+    code: "Group K",
+    time: "06-17 01:00 PM EDT",
+    home: "Portugal",
+    away: "DR Congo",
+    status: "Not started",
+  },
+  {
+    id: 66457042,
+    code: "Group L",
+    time: "06-17 04:00 PM EDT",
+    home: "England",
+    away: "Croatia",
+    status: "Not started",
+  },
+  {
+    id: 66457044,
+    code: "Group L",
+    time: "06-17 07:00 PM EDT",
+    home: "Ghana",
+    away: "Panama",
+    status: "Not started",
+  },
+  {
+    id: 66457032,
+    code: "Group K",
+    time: "06-17 10:00 PM EDT",
+    home: "Uzbekistan",
+    away: "Colombia",
+    status: "Not started",
+  },
+];
