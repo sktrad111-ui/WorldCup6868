@@ -18,6 +18,7 @@ type AppBet = Bet & {
 };
 
 type AppUser = {
+   invitedBy?: string;
   username: string;
   password: string;
   points: number;
@@ -283,7 +284,7 @@ const submitRecharge = async () => {
     });
   };
 
-  const confirmBet = () => {
+  const confirmBet = async () => {
     if (!currentUser || !selectedBet) return;
     if (stake <= 0) return alert("请输入投注积分");
     if (stake > currentUser.points) return alert("积分不足");
@@ -295,7 +296,27 @@ const submitRecharge = async () => {
       ...currentUser,
       points: currentUser.points - stake,
     });
-    
+  if (currentUser.invitedBy) {
+  const reward = Math.floor(stake * 0.05);
+
+  if (reward > 0) {
+    const { data: inviter } = await supabase
+      .from("users")
+      .select("*")
+      .eq("invite_code", currentUser.invitedBy)
+      .single();
+
+    if (inviter) {
+      await supabase
+        .from("users")
+        .update({
+          points: inviter.points + reward,
+          inviteReward: inviter.inviteReward + reward,
+        })
+        .eq("id", inviter.id);
+    }
+  }
+} 
     
 
     setSelectedBet(null);
@@ -654,7 +675,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
             <div style={styles.infoBox}>
               <div>邀请人数：{currentUser.invited}</div>
               <div>累计邀请奖励：{currentUser.inviteReward} 积分</div>
-              <div>好友注册填写你的邀请码，充值成功后你会获得好友充值金额的百分之10作为奖励。。</div>
+              <div>好友注册填写你的邀请码，充值成功后你会获得好友充值金额的百分之最高40作为奖励。。</div>
               <div>邀请奖励只在好友投注成功后发放。。</div>
             </div>
 
@@ -721,7 +742,44 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
                 我的邀请码：<b>{currentUser.inviteCode}</b>
               </div>
             </div>
+<button
+  onClick={() => {
+    const paypalEmail = prompt("请输入PayPal邮箱");
 
+    if (!paypalEmail) return;
+
+   const amount = Number(prompt("请输入提现金额(USD)"));
+
+if (!amount || amount <= 0) {
+  alert("请输入正确的提现金额");
+  return;
+}
+
+const needPoints = amount * 10;
+
+if (currentUser.points < needPoints) {
+  alert(`积分不足，提现 ${amount} USD 需要 ${needPoints} 积分`);
+  return;
+}
+
+    alert(
+      `提现申请已提交\nPayPal: ${paypalEmail}\n金额: ${amount} USD`
+    );
+  }}
+  style={{
+    width: "100%",
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 8,
+    border: "none",
+    background: "#f59e0b",
+    color: "#fff",
+    fontWeight: "bold",
+    cursor: "pointer",
+  }}
+>
+  提现申请
+</button>
             <button onClick={() => saveCurrentUser(null)} style={styles.logoutBtn}>
               退出登录
             </button>
