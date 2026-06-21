@@ -169,7 +169,7 @@ return () => clearInterval(timer);
     return alert("用户名已存在");
   }
 
- const newUser = {
+const newUser = {
   username,
   password,
   points: 0,
@@ -224,8 +224,8 @@ return () => clearInterval(timer);
   points: data.points || 0,
   inviteCode: data.invite_code,
   invitedBy: data.invited_by || "",
-  invited: 0,
-  inviteReward: 0,
+  invited: data.invited || 0,
+  inviteReward: data.invite_reward || 0,
 };
 
   saveCurrentUser(loginUser);
@@ -313,7 +313,7 @@ const submitRecharge = async () => {
         .from("users")
         .update({
           points: inviter.points + reward,
-          inviteReward: inviter.inviteReward + reward,
+         invite_reward: (inviter.invite_reward || 0) + reward,
         })
         .eq("id", inviter.id);
     }
