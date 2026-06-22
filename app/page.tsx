@@ -18,6 +18,7 @@ type AppBet = Bet & {
 };
 
 type AppUser = {
+id?: string;
    invitedBy?: string;
   username: string;
   password: string;
@@ -745,7 +746,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
               </div>
             </div>
 <button
-  onClick={() => {
+ onClick={async () => {
     const paypalEmail = prompt("请输入PayPal邮箱");
 
     if (!paypalEmail) return;
@@ -763,7 +764,18 @@ if (currentUser.points < needPoints) {
   alert(`积分不足，提现 ${amount} USD 需要 ${needPoints} 积分`);
   return;
 }
+const { error } = await supabase.from("withdraw_requests").insert({
+  user_id: null,
+  paypal_email: paypalEmail,
+  points: needPoints,
+  amount_usd: amount,
+  status: "pending",
+});
 
+if (error) {
+  alert("提现申请提交失败");
+  return;
+}
     alert(
       `提现申请已提交\nPayPal: ${paypalEmail}\n金额: ${amount} USD`
     );
