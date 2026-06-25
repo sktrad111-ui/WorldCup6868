@@ -665,7 +665,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
     return (
       <div style={styles.page}>
         <div style={styles.loginBox}>
-          <h1>⚽ World Cup Predictions</h1>
+          <h1>⚽ Soccer Mini Game</h1>
           <p style={styles.small}>Simulated Play · Points Entertainment Version</p>
 
           <div style={styles.authTabs}>
@@ -945,27 +945,20 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
     1 USDT = 10 Points
   </div>
 
-  <div style={{ marginTop: "10px", color: "#00ff99" }}>
-    After sending USDT, please contact customer service to complete your recharge.
-    <button
-  onClick={() => {
-    window.open("https://t.me/SKtrad111", "_blank");
-  }}
+<div style={{ marginTop: "10px", color: "#00ff99" }}>
+  After sending USDT, please contact customer service to complete your recharge.
+</div>
+
+<button
+  onClick={() => window.open("https://t.me/SKtrad111", "_blank")}
   style={{
-    width: "100%",
-    padding: 10,
-    marginTop: 8,
+    ...styles.confirmBtn,
     background: "#229ED9",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontWeight: "bold",
+    marginTop: 8,
   }}
 >
   💬 Contact Customer Service
 </button>
-  </div>
 </div>
 <button
   onClick={() => {
