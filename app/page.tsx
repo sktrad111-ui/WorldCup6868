@@ -46,6 +46,12 @@ async function testSupabase() {
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  useEffect(() => {
+  if (currentUser?.username === "2317577970") {
+    loadRequests();
+    loadWithdrawals();
+  }
+}, [currentUser]);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -54,7 +60,9 @@ async function testSupabase() {
   const [stake, setStake] = useState(10);
   const [rechargeAmount, setRechargeAmount] = useState(10);
   const [rechargeRequests, setRechargeRequests] = useState<any[]>([]);
-const [withdrawalRequests, setWithdrawalRequests] = useState<any[]>([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<any[]>([]);
+  const [myRecharges, setMyRecharges] = useState<any[]>([]);
+  const [myWithdrawals, setMyWithdrawals] = useState<any[]>([]);
   const payWithPaypal = async () => {
     alert("PayPal clicked");
 
@@ -297,7 +305,26 @@ const submitUsdtRecharge = async () => {
 
   alert("USDT充值申请已提交，请等待管理员审核");
 };
+const loadMyRecords = async () => {
+  if (!currentUser) return;
 
+  const { data: recharges } = await supabase
+    .from("recharge_requests")
+    .select("*")
+    .eq("username", currentUser.username)
+    .order("created_at", { ascending: false });
+
+  const { data: withdrawals } = await supabase
+    .from("withdrawal_requests")
+    .select("*")
+    .eq("username", currentUser.username)
+    .order("created_at", { ascending: false });
+
+  setMyRecharges(recharges || []);
+  setMyWithdrawals(withdrawals || []);
+
+  alert("Records loaded");
+};
 const loadRequests = async () => {
   const { data, error } = await supabase
     .from("recharge_requests")
@@ -368,7 +395,8 @@ const approveRecharge = async (id: string) => {
     })
     .eq("id", id);
 
-  alert("Recharge approved successfully");
+ alert("Recharge approved successfully");
+loadRequests();
 };
 const loadWithdrawals = async () => {
   const { data, error } = await supabase
@@ -446,7 +474,8 @@ const approveWithdrawal = async (id: string) => {
     })
     .eq("id", id);
 
-  alert("Withdrawal approved successfully");
+ alert("Withdrawal approved successfully");
+loadWithdrawals();
 };
   const chooseOption = (
     match: Match,
@@ -917,7 +946,25 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
   </div>
 
   <div style={{ marginTop: "10px", color: "#00ff99" }}>
-    Send USDT and contact admin for manual credit.
+    After sending USDT, please contact customer service to complete your recharge.
+    <button
+  onClick={() => {
+    window.open("https://t.me/SKtrad111", "_blank");
+  }}
+  style={{
+    width: "100%",
+    padding: 10,
+    marginTop: 8,
+    background: "#229ED9",
+    color: "#fff",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontWeight: "bold",
+  }}
+>
+  💬 Contact Customer Service
+</button>
   </div>
 </div>
 <button
@@ -1013,12 +1060,6 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
   >
     <h3>Admin Panel</h3>
 
-    <button
-      onClick={loadRequests}
-      style={styles.confirmBtn}
-    >
-      Load Recharge Requests
-    </button>
 {rechargeRequests.map((r) => (
   <div
     key={r.id}
@@ -1045,15 +1086,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
     </button>
   </div>
 ))}
-    <button
-      onClick={loadWithdrawals}
-      style={{
-        ...styles.confirmBtn,
-        marginTop: 8,
-      }}
-    >
-      Load Withdrawal Requests
-    </button>
+
     {withdrawalRequests.map((w) => (
   <div
     key={w.id}
