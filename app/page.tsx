@@ -311,17 +311,17 @@ const loadRequests = async () => {
   }
   setRechargeRequests(data || []);
 
-  const text = (data || [])
-    .map((r) => {
-      return (
-        "Username: " + r.username +
-        "\nAmount: " + r.amount +
-        "\nPoints: " + r.points +
-        "\nID: " + r.id
-      );
-    })
-    .join("\n\n");
-
+const text = (data || [])
+  .map((r) => {
+    return (
+      "Username: " + r.username +
+      "\nAmount: " + r.amount +
+      "\nPoints: " + r.points +
+      "\nID: " + r.id +
+      "\n\nType APPROVE-" + r.id + " to approve"
+    );
+  })
+  .join("\n\n");
  const id = prompt(
   (text || "No pending recharge requests") +
   "\n\nEnter ID to approve:"
@@ -383,16 +383,17 @@ const loadWithdrawals = async () => {
   }
   setWithdrawalRequests(data || []);
 
-  const text = (data || [])
-    .map((w) => {
-      return (
-        "Username: " + w.username +
-        "\nPoints: " + w.points +
-        "\nUSDT Address: " + w.usdt_address +
-        "\nID: " + w.id
-      );
-    })
-    .join("\n\n");
+ const text = (data || [])
+  .map((w) => {
+    return (
+      "Username: " + w.username +
+      "\nPoints: " + w.points +
+      "\nUSDT Address: " + w.usdt_address +
+      "\nID: " + w.id +
+      "\n\nType APPROVE-" + w.id + " to approve"
+    );
+  })
+  .join("\n\n");
 
   const id = prompt(
     (text || "No pending withdrawal requests") +
@@ -1018,7 +1019,32 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
     >
       Load Recharge Requests
     </button>
+{rechargeRequests.map((r) => (
+  <div
+    key={r.id}
+    style={{
+      background: "#f5f5f5",
+      padding: 8,
+      borderRadius: 6,
+      marginTop: 8,
+      fontSize: 12,
+    }}
+  >
+    <div>User: {r.username}</div>
+    <div>Amount: {r.amount}</div>
+    <div>Points: {r.points}</div>
 
+    <button
+      onClick={() => approveRecharge(r.id)}
+      style={{
+        ...styles.confirmBtn,
+        marginTop: 6,
+      }}
+    >
+      Approve Recharge
+    </button>
+  </div>
+))}
     <button
       onClick={loadWithdrawals}
       style={{
@@ -1028,6 +1054,32 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
     >
       Load Withdrawal Requests
     </button>
+    {withdrawalRequests.map((w) => (
+  <div
+    key={w.id}
+    style={{
+      background: "#fff5f5",
+      padding: 8,
+      borderRadius: 6,
+      marginTop: 8,
+      fontSize: 12,
+    }}
+  >
+    <div>User: {w.username}</div>
+    <div>Points: {w.points}</div>
+    <div>Address: {w.usdt_address}</div>
+
+    <button
+      onClick={() => approveWithdrawal(w.id)}
+      style={{
+        ...styles.confirmBtn,
+        marginTop: 6,
+      }}
+    >
+      Approve Withdrawal
+    </button>
+  </div>
+))}
   </div>
 )}
 
