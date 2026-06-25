@@ -53,6 +53,8 @@ async function testSupabase() {
 
   const [stake, setStake] = useState(10);
   const [rechargeAmount, setRechargeAmount] = useState(10);
+  const [rechargeRequests, setRechargeRequests] = useState<any[]>([]);
+const [withdrawalRequests, setWithdrawalRequests] = useState<any[]>([]);
   const payWithPaypal = async () => {
     alert("PayPal clicked");
 
@@ -237,10 +239,12 @@ const submitRecharge = async () => {
   if (!currentUser) return alert("请先登录");
 
   const amount = Number(rechargeAmount);
+  localStorage.setItem("rechargeAmount", String(amount));
 
   if (!amount || amount <= 0) {
     return alert("请输入充值金额");
   }
+  
 
   try {
     alert("正在跳转 PayPal...");
@@ -252,6 +256,7 @@ const submitRecharge = async () => {
       },
       body: JSON.stringify({ amount }),
     });
+
 
     const data = await res.json();
     console.log("PayPal result:", data);
@@ -266,7 +271,182 @@ const submitRecharge = async () => {
     alert("PayPal 支付失败");
   }
 };
+const submitUsdtRecharge = async () => {
+  if (!currentUser) return alert("请先登录");
 
+  const amount = Number(rechargeAmount);
+
+  if (!amount || amount <= 0) {
+    return alert("请输入充值金额");
+  }
+
+  const { error } = await supabase
+    .from("recharge_requests")
+    .insert({
+      username: currentUser.username,
+      amount,
+      points: amount * 10,
+      method: "USDT_TRC20",
+      status: "pending",
+    });
+
+  if (error) {
+    alert("提交失败：" + error.message);
+    return;
+  }
+
+  alert("USDT充值申请已提交，请等待管理员审核");
+};
+
+const loadRequests = async () => {
+  const { data, error } = await supabase
+    .from("recharge_requests")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+  setRechargeRequests(data || []);
+
+  const text = (data || [])
+    .map((r) => {
+      return (
+        "Username: " + r.username +
+        "\nAmount: " + r.amount +
+        "\nPoints: " + r.points +
+        "\nID: " + r.id
+      );
+    })
+    .join("\n\n");
+
+ const id = prompt(
+  (text || "No pending recharge requests") +
+  "\n\nEnter ID to approve:"
+);
+
+if (!id) return;
+
+approveRecharge(id);
+};
+const approveRecharge = async (id: string) => {
+  const { data, error } = await supabase
+    .from("recharge_requests")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) {
+    alert("Request not found");
+    return;
+  }
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("username", data.username)
+    .single();
+
+  if (!user) {
+    alert("User not found");
+    return;
+  }
+
+  await supabase
+    .from("users")
+    .update({
+      points: Number(user.points || 0) + Number(data.points || 0)
+    })
+    .eq("username", data.username);
+
+  await supabase
+    .from("recharge_requests")
+    .update({
+      status: "approved"
+    })
+    .eq("id", id);
+
+  alert("Recharge approved successfully");
+};
+const loadWithdrawals = async () => {
+  const { data, error } = await supabase
+    .from("withdrawal_requests")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+  setWithdrawalRequests(data || []);
+
+  const text = (data || [])
+    .map((w) => {
+      return (
+        "Username: " + w.username +
+        "\nPoints: " + w.points +
+        "\nUSDT Address: " + w.usdt_address +
+        "\nID: " + w.id
+      );
+    })
+    .join("\n\n");
+
+  const id = prompt(
+    (text || "No pending withdrawal requests") +
+    "\n\nEnter ID to approve:"
+  );
+
+  if (!id) return;
+
+  approveWithdrawal(id);
+};
+const approveWithdrawal = async (id: string) => {
+  const { data, error } = await supabase
+    .from("withdrawal_requests")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) {
+    alert("Withdrawal request not found");
+    return;
+  }
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("username", data.username)
+    .single();
+
+  if (!user) {
+    alert("User not found");
+    return;
+  }
+
+  if (Number(user.points || 0) < Number(data.points || 0)) {
+    alert("User points are not enough");
+    return;
+  }
+
+  await supabase
+    .from("users")
+    .update({
+      points: Number(user.points || 0) - Number(data.points || 0),
+    })
+    .eq("username", data.username);
+
+  await supabase
+    .from("withdrawal_requests")
+    .update({
+      status: "approved",
+    })
+    .eq("id", id);
+
+  alert("Withdrawal approved successfully");
+};
   const chooseOption = (
     match: Match,
     market: string,
@@ -455,33 +635,33 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
     return (
       <div style={styles.page}>
         <div style={styles.loginBox}>
-          <h1>⚽ 世界杯积分竞猜</h1>
-          <p style={styles.small}>模拟试玩 · 积分娱乐版</p>
+          <h1>⚽ World Cup Predictions</h1>
+          <p style={styles.small}>Simulated Play · Points Entertainment Version</p>
 
           <div style={styles.authTabs}>
             <button
               onClick={() => setMode("login")}
               style={mode === "login" ? styles.authActive : styles.authBtn}
             >
-              登录
+              Login
             </button>
             <button
               onClick={() => setMode("register")}
               style={mode === "register" ? styles.authActive : styles.authBtn}
             >
-              注册
+              Register
             </button>
           </div>
 
           <input
-            placeholder="用户名"
+            placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             style={styles.input}
           />
 
           <input
-            placeholder="密码"
+            placeholder="Password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -490,7 +670,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
 
           {mode === "register" && (
             <input
-              placeholder="邀请码（可选）"
+              placeholder="Invite Code (Optional)"
               value={inviteInput}
               onChange={(e) => setInviteInput(e.target.value)}
               style={styles.input}
@@ -501,7 +681,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
             onClick={mode === "login" ? login : register}
             style={styles.confirmBtn}
           >
-            {mode === "login" ? "登录" : "注册并进入"}
+            {mode === "login" ? "Login" : "Register and Enter"}
           </button>
         </div>
       </div>
@@ -513,12 +693,12 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
       <div style={styles.phone}>
         <div style={styles.header}>
           <div>
-            <div style={styles.title}>⚽ 世界杯积分竞猜</div>
-            <div style={styles.subTitle}>欢迎，{currentUser.username}</div>
+            <div style={styles.title}>⚽ World Cup Predictions</div>
+            <div style={styles.subTitle}>Welcome, {currentUser.username}</div>
           </div>
 
           <div style={styles.pointsBox}>
-            <span>积分</span>
+            <span>Points</span>
             <b>{currentUser.points}</b>
           </div>
 
@@ -528,7 +708,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
         {tab === "bet" && (
           <>
             <div style={styles.section}>
-              <h3>🔥 可竞猜比赛</h3>
+              <h3>🔥 Upcoming Matches</h3>
 
 {upcomingMatches.map((match) => (
                 <div key={match.id} style={styles.matchListCard}>
@@ -558,7 +738,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
                   </button>
                 </div>
               ))}
-              <h3>✅ 已结束比赛</h3>
+              <h3>✅ Finished Matches</h3>
 
 {finishedMatches.map((match) => (
   <div key={match.id} style={styles.matchListCard}>
@@ -580,28 +760,28 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
         opacity: 0.5,
       }}
     >
-      已结束
+      Finished
     </button>
   </div>
 ))}
             </div>
 
             <div style={styles.section}>
-              <h3>我的投注记录</h3>
+              <h3>My Betting Records</h3>
 
               {bets.length === 0 ? (
-                <div style={styles.empty}>暂无投注记录</div>
+                <div style={styles.empty}>No betting records available</div>
               ) : (
                 bets.map((b) => (
                   <div key={b.id} style={styles.recordItem}>
                     <div>
                       <b>{b.match}</b>
                       <div style={styles.small}>
-                        {b.market} / {b.option} / {b.stake}积分 / 倍率 {b.odds}
+                        {b.market} / {b.option} / {b.stake} points / Odds {b.odds}
                       </div>
                       <div style={styles.small}>
-                        状态：{b.status}{" "}
-                        {b.winPoints ? `+${b.winPoints}积分` : ""}
+                        Status: {b.status}{" "}
+                        {b.winPoints ? `+${b.winPoints} points` : ""}
                       </div>
                     </div>
 
@@ -617,7 +797,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
 
         {tab === "schedule" && (
           <div style={styles.section}>
-            <h3>世界杯赛程 / 开奖</h3>
+            <h3>World Cup Schedule / Results</h3>
 
             {matches.map((m) => (
               <div key={m.id} style={styles.scheduleItem}>
@@ -629,15 +809,15 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
   </b>
 
   <div style={styles.small}>
-    状态：{m.status}
+    Status: {m.status}
   </div>
 
   <div style={styles.small}>
-    比分：{m.homeScore ?? 0} - {m.awayScore ?? 0}
+    Score: {m.homeScore ?? 0} - {m.awayScore ?? 0}
   </div>
 
   <div style={styles.small}>
-    实时赔率：主胜 {m.odds?.home} / 平 {m.odds?.draw} / 客胜 {m.odds?.away}
+    Live Odds: Home Win {m.odds?.home} / Draw {m.odds?.draw} / Away Win {m.odds?.away}
   </div>
 
   <div style={styles.small}>
@@ -655,7 +835,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
                     模拟开奖
                   </button>
                 ) : (
-                  <span style={styles.status}>已结束</span>
+                  <span style={styles.status}>Finished</span>
                 )}
               </div>
             ))}
@@ -664,33 +844,33 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
 
         {tab === "invite" && (
           <div style={styles.section}>
-            <h3>邀请好友</h3>
+            <h3>Invite Friends</h3>
 
             <div style={styles.inviteCard}>
-              <div style={styles.inviteTitle}>我的邀请码</div>
+              <div style={styles.inviteTitle}>My Invite Code</div>
               <div style={styles.inviteCode}>{currentUser.inviteCode}</div>
 
               <button onClick={copyInviteCode} style={styles.whiteBtn}>
-                复制邀请码
+                Copy Invite Code
               </button>
             </div>
 
             <div style={styles.infoBox}>
-              <div>邀请人数：{currentUser.invited}</div>
-              <div>累计邀请奖励：{currentUser.inviteReward} 积分</div>
-              <div>好友注册填写你的邀请码，充值成功后你会获得好友充值金额的百分之最高40作为奖励。。</div>
-              <div>邀请奖励只在好友投注成功后发放。。</div>
+              <div>Invited Users: {currentUser.invited}</div>
+              <div>Total Invite Rewards: {currentUser.inviteReward} Points</div>
+              <div>Friends can use your invite code to register. You will receive up to 40% of their deposit amount as a reward after they successfully deposit.</div>
+              <div>Invite rewards are only issued after your friends place successful bets.</div>
             </div>
 
             {inviteRanking.length === 0 ? (
-              <div style={styles.empty}>暂无邀请记录</div>
+              <div style={styles.empty}>No invite records available</div>
             ) : (
               inviteRanking.map((u, index) => (
                 <div key={u.username} style={styles.rankItem}>
                   <b>#{index + 1}</b>
                   <span>{u.username}</span>
                   <span>{u.invited} 人</span>
-                  <b>{u.inviteReward} 积分</b>
+                  <b>{u.inviteReward} Points</b>
                 </div>
               ))
             )}
@@ -698,14 +878,58 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
         )}
 {tab === "recharge" && (
   <div style={styles.section}>
-    <h3>充值中心</h3>
+    <h3>Deposit Center</h3>
 
     <div style={styles.infoBox}>
-      <div>充值比例：1元 = 10积分</div>
-      <div>10元 = 100积分</div>
-      <div>50元 = 500积分</div>
-      <div>100元 = 1000积分</div>
+      <div>Recharge Rate：1 USD/USDT = 10积分</div>
+      <div>10 USD/USDT = 100积分</div>
+      <div>50 USD/USDT = 500积分</div>
+      <div>100 USD/USDT = 1000积分</div>
     </div>
+    <div style={{
+  background: "#111",
+  padding: "15px",
+  borderRadius: "10px",
+  marginTop: "15px",
+  color: "#fff"
+}}>
+  <h4>USDT Recharge (TRC20)</h4>
+
+  <div
+    style={{
+      background: "#222",
+      padding: "10px",
+      borderRadius: "6px",
+      wordBreak: "break-all",
+      marginTop: "10px"
+    }}
+  >
+    TDUqzoEr175nM34duPdGZizP2jG8zBzDgy
+  </div>
+
+  <div style={{ marginTop: "10px" }}>
+    Network: TRON (TRC20)
+  </div>
+
+  <div style={{ marginTop: "5px" }}>
+    1 USDT = 10 Points
+  </div>
+
+  <div style={{ marginTop: "10px", color: "#00ff99" }}>
+    Send USDT and contact admin for manual credit.
+  </div>
+</div>
+<button
+  onClick={() => {
+    navigator.clipboard.writeText(
+      "TDUqzoEr175nM34duPdGZizP2jG8zBzDgy"
+    );
+    alert("USDT address copied");
+  }}
+  style={styles.confirmBtn}
+>
+  Copy USDT Address
+</button>
 
     <input
       type="number"
@@ -722,63 +946,134 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
 >
   Pay {rechargeAmount} USD with PayPal
 </button>
+<button
+  onClick={submitUsdtRecharge}
+  style={styles.confirmBtn}
+>
+  Submit USDT Recharge Request
+</button>
+{rechargeRequests.map((r) => (
+  <div
+    key={r.id}
+    style={{
+      background: "#f5f5f5",
+      padding: 8,
+      borderRadius: 6,
+      marginTop: 8,
+      fontSize: 12,
+    }}
+  >
+    <div>User: {r.username}</div>
+    <div>Amount: {r.amount}</div>
+    <div>Points: {r.points}</div>
+
+    <button
+      onClick={() => approveRecharge(r.id)}
+      style={{
+        ...styles.confirmBtn,
+        marginTop: 6,
+      }}
+    >
+      Approve Recharge
+    </button>
+  </div>
+))}
 
   </div>
 )}
         {tab === "mine" && (
           <div style={styles.section}>
-            <h3>我的账户</h3>
+            <h3>My Account</h3>
 
             <div style={styles.profile}>
               <div style={styles.avatar}>⚽</div>
               <div>
                 <b>{currentUser.username}</b>
-                <div style={styles.small}>当前积分：{currentUser.points}</div>
+                <div style={styles.small}>Current Points: {currentUser.points}</div>
               </div>
             </div>
 
             <div style={styles.infoBox}>
-              <div>投注次数：{bets.length}</div>
-              <div>邀请人数：{currentUser.invited}</div>
-              <div>邀请奖励：{currentUser.inviteReward} 积分</div>
+              <div> Betting次数: {bets.length}</div>
+              <div>Invited Users: {currentUser.invited}</div>
+              <div>Invite Rewards: {currentUser.inviteReward} Points</div>
               <div>
-                我的邀请码：<b>{currentUser.inviteCode}</b>
+                My Invite Code: <b>{currentUser.inviteCode}</b>
               </div>
             </div>
+{currentUser?.username === "2317577970" && (
+  <div
+    style={{
+      background: "#fff",
+      padding: 12,
+      borderRadius: 10,
+      marginBottom: 10,
+    }}
+  >
+    <h3>Admin Panel</h3>
+
+    <button
+      onClick={loadRequests}
+      style={styles.confirmBtn}
+    >
+      Load Recharge Requests
+    </button>
+
+    <button
+      onClick={loadWithdrawals}
+      style={{
+        ...styles.confirmBtn,
+        marginTop: 8,
+      }}
+    >
+      Load Withdrawal Requests
+    </button>
+  </div>
+)}
+
 <button
  onClick={async () => {
-    const paypalEmail = prompt("请输入PayPal邮箱");
+    const withdrawAddress = prompt(
 
-    if (!paypalEmail) return;
+  "Please enter your PayPal email or USDT(TRC20) address"
+);
 
-   const amount = Number(prompt("请输入提现金额(USD)"));
+if (!withdrawAddress) return;
+
+   const amount = Number(prompt("Please enter the withdrawal amount (USD)"));
 
 if (!amount || amount <= 0) {
-  alert("请输入正确的提现金额");
+  alert("Please enter the correct withdrawal amount");
   return;
 }
 
 const needPoints = amount * 10;
 
 if (currentUser.points < needPoints) {
-  alert(`积分不足，提现 ${amount} USD 需要 ${needPoints} 积分`);
+  alert(`Insufficient points. Withdrawing ${amount} USD requires ${needPoints} points.`);
   return;
 }
-const { error } = await supabase.from("withdraw_requests").insert({
-  user_id: null,
-  paypal_email: paypalEmail,
+const { error } = await supabase
+.from("withdrawal_requests")
+.insert({
+  username: currentUser.username,
   points: needPoints,
-  amount_usd: amount,
+  usdt_address: withdrawAddress,
   status: "pending",
-});
+})
 
 if (error) {
-  alert("提现申请提交失败");
+  alert(error.message);
+  console.log(error);
   return;
 }
-    alert(
-      `提现申请已提交\nPayPal: ${paypalEmail}\n金额: ${amount} USD`
-    );
+ alert(
+  `Withdrawal request submitted
+
+Address: ${withdrawAddress}
+
+Amount: ${amount} USD`
+);
   }}
   style={{
     width: "100%",
@@ -792,33 +1087,45 @@ if (error) {
     cursor: "pointer",
   }}
 >
-  提现申请
+  
+  Withdrawal Request
 </button>
+<div
+  style={{
+    fontSize: 13,
+    color: "#ff9800",
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 10,
+  }}
+>
+  ⚠️ Use the same withdrawal method as your deposit method.
+</div>
             <button onClick={() => saveCurrentUser(null)} style={styles.logoutBtn}>
-              退出登录
+              Logout
             </button>
           </div>
         )}
       </div>
       <div style={styles.tabs}>
   <button style={styles.tabBtn} onClick={() => setTab("bet")}>
-    ⚽<br />竞猜
+    ⚽<br />Predictions
   </button>
 
   <button style={styles.tabBtn} onClick={() => setTab("schedule")}>
-    📅<br />赛程
+    📅<br />Fixtures
   </button>
 
   <button style={styles.tabBtn} onClick={() => setTab("invite")}>
-    👥<br />邀请
+    👥<br />Invite Friends
   </button>
 
   <button style={styles.tabBtn} onClick={() => setTab("recharge")}>
-    💰<br />充值
+    💰<br />Deposit
   </button>
 
   <button style={styles.tabBtn} onClick={() => setTab("mine")}>
-    👤<br />我的
+    👤<br />Account
   </button>
 </div>
 
@@ -914,15 +1221,15 @@ if (error) {
                 </div>
 
                 <div style={styles.expected}>
-                  投注积分：{stake}
+                  Betting Points: {stake}
                   <br />
-                  赔率：{selectedBet.odds}
+                  Odds: {selectedBet.odds}
                   <br />
-                  预计中奖：<b>{stake * selectedBet.odds}</b> 积分
+                  Expected Winnings: <b>{stake * selectedBet.odds}</b> Points
                 </div>
 
                 <button onClick={confirmBet} style={styles.confirmBtn}>
-                  确认投注
+                  Confirm Bet
                 </button>
               </div>
             )}
