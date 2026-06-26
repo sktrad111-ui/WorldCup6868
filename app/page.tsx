@@ -12,7 +12,7 @@ type BetStatus = "待开奖" | "已中奖" | "未中奖";
 
 type AppBet = Bet & {
   id: number;
-  matchId: number;
+  matchId: string;
   status: BetStatus;
   winPoints?: number;
 };
@@ -29,8 +29,18 @@ id?: string;
 };
 
 export default function Home() {
-  useEffect(() => {
+useEffect(() => {
   testSupabase();
+
+  fetch("/api/odds")
+    .then((res) => res.json())
+    .then((data) => {
+      setApiOdds(data.odds || []);
+      console.log("API赔率:", data.odds);
+    })
+    .catch((err) => {
+      console.error("赔率获取失败:", err);
+    });
 }, []);
 
 async function testSupabase() {
@@ -92,6 +102,8 @@ async function testSupabase() {
   const [bets, setBets] = useState<AppBet[]>([]);
   const [matches, setMatches] = useState<Match[]>(defaultMatches);
   
+  const [apiOdds, setApiOdds] = useState<any[]>([]);
+ 
   const upcomingMatches = matches.filter(
   (m) => m.status !== "已结束"
 );
@@ -127,6 +139,13 @@ const finishedMatches = matches.filter(
     if (savedBets) setBets(JSON.parse(savedBets));
     if (savedMatches) setMatches(JSON.parse(savedMatches));
     fetchMatches();
+    fetch("/api/odds")
+  .then((res) => res.json())
+  .then((data) => {
+    setApiOdds(data.odds || []);
+    console.log("API赔率:", data.odds);
+  })
+  .catch((err) => console.error("赔率获取失败:", err));
 
 const timer = setInterval(() => {
   fetchMatches();
@@ -230,6 +249,7 @@ const newUser = {
   }
 
  const loginUser = {
+  id: data.id,
   username: data.username,
   password: data.password,
   points: data.points || 0,
@@ -240,9 +260,18 @@ const newUser = {
 };
 
   saveCurrentUser(loginUser);
-  setUsername("");
-  setPassword("");
+setUsername("");
+setPassword("");
+
+setTimeout(() => {
+  loadMyBets();
+}, 300);
 };
+useEffect(() => {
+  if (currentUser?.id) {
+    loadMyBets();
+  }
+}, [currentUser?.id]);
 const submitRecharge = async () => {
   if (!currentUser) return alert("请先登录");
 
@@ -477,6 +506,13 @@ const approveWithdrawal = async (id: string) => {
  alert("Withdrawal approved successfully");
 loadWithdrawals();
 };
+const getApiOddsForMatch = (match: Match) => {
+  return apiOdds.find(
+    (o) =>
+      o.homeTeam?.toLowerCase() === match.home?.toLowerCase() &&
+      o.awayTeam?.toLowerCase() === match.away?.toLowerCase()
+  );
+};
   const chooseOption = (
     match: Match,
     market: string,
@@ -487,7 +523,7 @@ loadWithdrawals();
 
     setSelectedBet({
       id: Date.now(),
-      matchId: match.id,
+      matchId: String(match.id),
       match: `${match.home} vs ${match.away}`,
       market,
       option,
@@ -496,46 +532,90 @@ loadWithdrawals();
       status: "待开奖",
     });
   };
+const loadMyBets = async () => {
+  if (!currentUser?.id) return;
 
-  const confirmBet = async () => {
-    if (!currentUser || !selectedBet) return;
-    if (stake <= 0) return alert("请输入投注积分");
-    if (stake > currentUser.points) return alert("积分不足");
+  const { data, error } = await supabase
+    .from("bets")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
 
-    const newBet = { ...selectedBet, id: Date.now(), stake };
-    saveBets([newBet, ...bets]);
-
-    updateUser({
-      ...currentUser,
-      points: currentUser.points - stake,
-    });
-  if (currentUser.invitedBy) {
-  const reward = Math.floor(stake * 0.05);
-
-  if (reward > 0) {
-    const { data: inviter } = await supabase
-      .from("users")
-      .select("*")
-      .eq("invite_code", currentUser.invitedBy)
-      .single();
-
-    if (inviter) {
-      await supabase
-        .from("users")
-        .update({
-          points: inviter.points + reward,
-         invite_reward: (inviter.invite_reward || 0) + reward,
-        })
-        .eq("id", inviter.id);
-    }
+  if (error) {
+    console.log(error);
+    alert("Load bets failed: " + error.message);
+    return;
   }
-} 
-    
 
-    setSelectedBet(null);
-    setSelectedMatch(null);
-    setStake(10);
-  };
+  const formattedBets = (data || []).map((b: any) => ({
+    id: Date.now() + Math.random(),
+    matchId: String(b.match_id),
+    match: b.match_name,
+    market: b.market,
+    option: b.option,
+    odds: b.odds,
+    stake: b.stake,
+   status:
+  (b.status === "win"
+    ? "已中奖"
+    : b.status === "lose"
+    ? "未中奖"
+    : "待开奖") as BetStatus,
+    winPoints: b.win_points || 0,
+  }));
+
+  setBets(formattedBets);
+};
+ const confirmBet = async () => {
+  if (!currentUser || !selectedBet) return;
+  if (!currentUser.id) return alert("用户ID缺失，请重新登录");
+  if (stake <= 0) return alert("请输入投注积分");
+  if (stake > currentUser.points) return alert("积分不足");
+
+  const { error: betError } = await supabase.from("bets").insert({
+    user_id: currentUser.id,
+    match_id: String(selectedBet.matchId),
+    match_name: selectedBet.match,
+    market: selectedBet.market,
+    option: selectedBet.option,
+    odds: Math.ceil(Number(selectedBet.odds)),
+    stake: stake,
+    status: "pending",
+    win_points: 0,
+  });
+
+  if (betError) {
+    console.log(betError);
+    return alert("下注失败：" + betError.message);
+  }
+
+  const newPoints = currentUser.points - stake;
+
+  const { error: userError } = await supabase
+    .from("users")
+    .update({ points: newPoints })
+    .eq("id", currentUser.id);
+
+  if (userError) {
+    console.log(userError);
+    return alert("扣除积分失败：" + userError.message);
+  }
+
+  const newBet = { ...selectedBet, id: Date.now(), stake };
+
+  await loadMyBets();
+
+  saveCurrentUser({
+    ...currentUser,
+    points: newPoints,
+  });
+
+  alert("Bet submitted successfully");
+
+  setSelectedBet(null);
+  setSelectedMatch(null);
+  setStake(10);
+};
 const getBetResult = (match: Match, bet: AppBet): boolean | null => {
   const homeScore = match.homeScore ?? 0;
   const awayScore = match.awayScore ?? 0;
@@ -565,7 +645,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
   const nextBets = bets.map((b) => {
     if (b.status !== "待开奖") return b;
 
-    const match = latestMatches.find((m) => m.id === b.matchId);
+    const match = latestMatches.find((m) => String(m.id) === String(b.matchId));
     if (!match) return b;
     if (match.status !== "已结束") return b;
 
@@ -623,7 +703,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
     let added = 0;
 
     const nextBets = bets.map((b) => {
-      if (b.matchId !== matchId || b.status !== "待开奖") return b;
+      if (String(b.matchId) !== String(matchId) || b.status !== "待开奖") return b;
 
       const isWin =
         (b.market === "胜平负" && b.option === result.winner) ||
@@ -1042,6 +1122,33 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
                 My Invite Code: <b>{currentUser.inviteCode}</b>
               </div>
             </div>
+            <div style={styles.infoBox}>
+  <h4>My Bets</h4>
+
+  {bets.length === 0 ? (
+    <div>No bets yet</div>
+  ) : (
+    bets.map((b) => (
+      <div
+        key={b.id}
+        style={{
+          background: "#f5f5f5",
+          padding: 8,
+          borderRadius: 6,
+          marginTop: 8,
+          fontSize: 12,
+        }}
+      >
+        <div>Match: {b.match}</div>
+        <div>Market: {b.market}</div>
+        <div>Option: {b.option}</div>
+        <div>Stake: {b.stake}</div>
+        <div>Odds: {b.odds}</div>
+        <div>Status: {b.status}</div>
+      </div>
+    ))
+  )}
+</div>
 {currentUser?.username === "2317577970" && (
   <div
     style={{
@@ -1241,29 +1348,42 @@ Amount: ${amount} USD`
                   <div style={styles.marketTitle}>{market.name}</div>
 
                   <div style={styles.oddsGrid}>
-                    {market.options.map((o) => (
-                      <button
-                        key={o.name}
-                        onClick={() =>
-                          chooseOption(
-                            selectedMatch,
-                            market.name,
-                            o.name,
-                            o.odds
-                          )
-                        }
-                        style={{
-                          ...styles.oddsButton,
-                          ...(selectedBet?.market === market.name &&
-                          selectedBet?.option === o.name
-                            ? styles.activeOdds
-                            : {}),
-                        }}
-                      >
-                        <span>{o.name}</span>
-                        <b>{o.odds}</b>
-                      </button>
-                    ))}
+                   {market.options.map((o) => {
+  const apiOdd = getApiOddsForMatch(selectedMatch);
+
+  const dynamicOdds =
+  market.name === "胜平负" && o.name === "主胜"
+    ? apiOdd?.odds?.home ?? o.odds
+    : market.name === "胜平负" && o.name === "平"
+    ? apiOdd?.odds?.draw ?? o.odds
+    : market.name === "胜平负" && o.name === "主负"
+    ? apiOdd?.odds?.away ?? o.odds
+    : o.odds;
+
+  return (
+    <button
+      key={o.name}
+      onClick={() =>
+        chooseOption(
+          selectedMatch,
+          market.name,
+          o.name,
+          dynamicOdds
+        )
+      }
+      style={{
+        ...styles.oddsButton,
+        ...(selectedBet?.market === market.name &&
+        selectedBet?.option === o.name
+          ? styles.activeOdds
+          : {}),
+      }}
+    >
+      <span>{o.name}</span>
+      <b>{dynamicOdds}</b>
+    </button>
+  );
+})}
                   </div>
                 </div>
               ))}
