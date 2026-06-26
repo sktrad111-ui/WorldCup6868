@@ -968,7 +968,7 @@ const autoSettleFinishedMatches = (latestMatches: Match[]) => {
             <div style={styles.infoBox}>
               <div>Invited Users: {currentUser.invited}</div>
               <div>Total Invite Rewards: {currentUser.inviteReward} Points</div>
-              <div>Friends can use your invite code to register. You will receive up to 40% of their deposit amount as a reward after they successfully deposit.</div>
+              <div>Invite friends to register with your code and earn up to 40% of their deposit amount as a reward.</div>
               <div>Invite rewards are only issued after your friends place successful bets.</div>
             </div>
 
