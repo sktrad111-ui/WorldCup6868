@@ -30,10 +30,13 @@ function formatEDT(date?: string | null) {
 
 export async function GET() {
   try {
-    const { data, error } = await supabase
-      .from("matches")
-      .select("*")
-      .order("match_time", { ascending: true });
+   const now = new Date().toISOString();
+
+const { data, error } = await supabase
+  .from("matches")
+  .select("*")
+  .gte("match_time", now)
+  .order("match_time", { ascending: true });
 
     if (error) {
       return NextResponse.json(
