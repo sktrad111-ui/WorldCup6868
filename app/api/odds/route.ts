@@ -7,7 +7,7 @@ function boostOdds(value: number | undefined | null) {
   const n = Number(value);
   if (!n || Number.isNaN(n)) return null;
 
-  return Number((n * 1.2).toFixed(2));
+  return Number((n * 1.1).toFixed(2));
 }
 
 export async function GET() {
